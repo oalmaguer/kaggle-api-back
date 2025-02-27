@@ -34,7 +34,10 @@ API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:5000')
 
 # Initialize Supabase client
 try:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    supabase = create_client(
+        supabase_url=SUPABASE_URL,
+        supabase_key=SUPABASE_KEY
+    )
     logger.info("Supabase client initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize Supabase client: {str(e)}")
