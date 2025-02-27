@@ -28,7 +28,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("Missing required environment variables: SUPABASE_URL and SUPABASE_KEY must be set")
 
 # API configuration
-API_HOST = os.getenv('API_HOST', '0.0.0.0')
+API_HOST = '0.0.0.0'  # Always bind to all interfaces
 API_PORT = int(os.getenv('PORT', os.getenv('API_PORT', 5000)))  # Use PORT for Render compatibility
 API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:5000')
 
@@ -293,4 +293,4 @@ def hello_world():
 if __name__ == '__main__':
     logger.info(f"Starting API server on {API_HOST}:{API_PORT}")
     logger.info(f"API Base URL: {API_BASE_URL}")
-    app.run(host=API_HOST, port=API_PORT) 
+    app.run(host=API_HOST, port=API_PORT, debug=False) 
