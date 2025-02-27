@@ -2,7 +2,7 @@ flask==3.0.2
 flask-cors==4.0.0
 pandas==2.2.0
 python-dotenv==1.0.1
-supabase==2.3.5
+supabase==1.2.0
 requests==2.31.0
 python-magic==0.4.27
 chardet==5.2.0

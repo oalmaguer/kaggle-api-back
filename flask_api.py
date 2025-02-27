@@ -2,7 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import pandas as pd
 import os
-from supabase import create_client
+from supabase.client import Client
 from io import BytesIO
 import secrets
 from functools import wraps
@@ -34,10 +34,16 @@ API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:5000')
 
 # Initialize Supabase client
 try:
-    supabase = create_client(
-        supabase_url=SUPABASE_URL,
-        supabase_key=SUPABASE_KEY
-    )
+    # First try with direct initialization
+    try:
+        supabase = Client(SUPABASE_URL, SUPABASE_KEY)
+    except TypeError:
+        # If that fails, try with the create_client function
+        from supabase import create_client
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    
+    # Test the connection
+    supabase.auth.get_session()  # This will fail early if the connection is not working
     logger.info("Supabase client initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize Supabase client: {str(e)}")
