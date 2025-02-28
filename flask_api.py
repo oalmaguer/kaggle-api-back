@@ -30,7 +30,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 # API configuration
 API_HOST = '0.0.0.0'  # Always bind to all interfaces
 API_PORT = int(os.getenv('PORT', os.getenv('API_PORT', 5000)))  # Use PORT for Render compatibility
-API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:5000')
+API_BASE_URL = os.getenv('API_BASE_URL')
 
 # Initialize Supabase client
 try:
@@ -49,6 +49,36 @@ except Exception as e:
     logger.error(f"Failed to initialize Supabase client: {str(e)}")
     raise
 
+def get_user_from_subdomain(subdomain):
+    """Get user ID from subdomain"""
+    try:
+        result = supabase.table('user_settings').select("user_id").eq('settings->>subdomain', subdomain).execute()
+        if result.data:
+            return result.data[0]['user_id']
+        return None
+    except Exception as e:
+        logger.error(f"Error getting user from subdomain: {str(e)}")
+        return None
+
+@app.before_request
+def handle_subdomain():
+    """Handle subdomain routing"""
+    try:
+        host = request.headers.get('Host', '')
+        if '.' in host and not host.startswith('localhost'):
+            subdomain = host.split('.')[0]
+            if subdomain:
+                user_id = get_user_from_subdomain(subdomain)
+                if user_id:
+                    # Store user_id in request context
+                    request.user_id = user_id
+                    return None
+                else:
+                    return jsonify({"error": "Invalid subdomain"}), 404
+    except Exception as e:
+        logger.error(f"Error handling subdomain: {str(e)}")
+    return None
+
 def require_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -56,13 +86,23 @@ def require_api_key(f):
         if not api_key:
             return jsonify({"error": "No API key provided"}), 401
         
+        # Get user_id from subdomain first
+        user_id = getattr(request, 'user_id', None)
+        
         # Verify API key in Supabase
         try:
             result = supabase.table('api_keys').select("user_id").eq('key', api_key).execute()
             if not result.data:
                 return jsonify({"error": "Invalid API key"}), 401
+                
+            api_key_user_id = result.data[0]['user_id']
+            
+            # If request came through subdomain, verify user matches
+            if user_id and user_id != api_key_user_id:
+                return jsonify({"error": "API key does not match subdomain owner"}), 403
+                
             # Add user_id to request context
-            request.user_id = result.data[0]['user_id']
+            request.user_id = api_key_user_id
         except Exception as e:
             logger.error(f"Error verifying API key: {str(e)}")
             return jsonify({"error": "Error verifying API key"}), 500
@@ -240,7 +280,11 @@ def load_csv_from_supabase(bucket_path=None):
             detected_encoding = detected['encoding']
             if detected_encoding:
                 try:
-                    df = pd.read_csv(BytesIO(response), encoding=detected_encoding, on_bad_lines='skip')
+                    df = pd.read_csv(
+                        BytesIO(response), 
+                        encoding=detected_encoding,
+                        on_bad_lines='skip'
+                    )
                     logger.info(f"Successfully loaded dataset using detected encoding: {detected_encoding}")
                     return df
                 except Exception as e:
@@ -256,10 +300,8 @@ def load_csv_from_supabase(bucket_path=None):
             try:
                 df = pd.read_csv(
                     BytesIO(response), 
-                    encoding=encoding, 
-                    on_bad_lines='skip',
-                    engine='python',
-                    encoding_errors='replace'
+                    encoding=encoding,
+                    on_bad_lines='skip'
                 )
                 logger.info(f"Successfully loaded dataset using encoding: {encoding}")
                 return df
